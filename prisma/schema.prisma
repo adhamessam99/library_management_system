@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id                Int       @id @default(autoincrement())
+  title             String    @db.VarChar(255)
+  author            String    @db.VarChar(255)
+  isbn              String    @unique @db.VarChar(20)
+  totalQuantity     Int       @default(0)
+  availableQuantity Int       @default(0)
+  shelfLocation     String    @db.VarChar(100)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  borrowingRecords  BorrowingRecord[]
+
+  @@index([title])
+  @@index([author])
+  @@map("books")
+}
+
+model Borrower {
+  id               Int       @id @default(autoincrement())
+  name             String    @db.VarChar(255)
+  email            String    @unique @db.VarChar(255)
+  registeredDate   DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  borrowingRecords BorrowingRecord[]
+
+  @@index([email])
+  @@map("borrowers")
+}
+
+model BorrowingRecord {
+  id           Int          @id @default(autoincrement())
+  bookId       Int
+  borrowerId   Int
+
+  book         Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  borrower     Borrower     @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+
+  borrowedDate DateTime     @default(now())
+  dueDate      DateTime
+  returnedDate DateTime?
+  status       BorrowStatus @default(ACTIVE)
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([borrowerId])
+  @@index([bookId])
+  // Compound index for active borrowings by due date
+  @@index([status, dueDate])
+  @@map("borrowing_records")
+}
+
+enum BorrowStatus {
+  ACTIVE
+  RETURNED
+}
