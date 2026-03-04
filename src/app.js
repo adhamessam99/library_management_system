@@ -1,119 +1,82 @@
-/**
- * Main Express Application
- * Complete setup showing integration of all modules
- */
-
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const prisma = require('./utils/prisma');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./middlewares/error.middleware');
 const { apiLimiter } = require('./middlewares/rateLimit.middleware');
 
-// Import routes
-const bookRoutes = require('./routes/v1/book.routes');
+// Import the bundled v1 routes
+const v1Routes = require('./routes/v1');
 
-// Create Express app
 const app = express();
 
 // ============================================
-// MIDDLEWARE SETUP
+// SECURITY & GLOBAL MIDDLEWARE
 // ============================================
 
-/**
- * CORS Middleware
- * Allow requests from any origin (customize for production)
- */
+// Set security HTTP headers
+app.use(helmet());
+
+// Enable CORS
 app.use(cors());
 
-// 2. Apply the general rate limiter to all API routes
-// This protects your server from brute force and DoS attacks
+// Global rate limiting to prevent abuse
 app.use('/api', apiLimiter);
 
-/**
- * Body Parser Middleware
- * Parse incoming JSON bodies
- */
+// Body parsers with size limits for security
 app.use(express.json({ limit: '10kb' }));
-
-/**
- * URL Encoded Parser Middleware
- * Parse incoming form-encoded bodies
- */
-app.use(express.urlencoded({ limit: '10kb', extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // ============================================
 // API ROUTES
 // ============================================
 
 /**
- * Health Check Endpoint
- * GET /api/health
+ * Health Check for monitoring and Docker
  */
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString() 
+    message: 'Library Management System API is running',
+    timestamp: new Date().toISOString()
   });
 });
 
 /**
- * V1 API Routes
- * All book routes are mounted under /api/v1
- * Endpoints:
- *   - POST   /api/v1/books              Create new book
- *   - GET    /api/v1/books              Get all books (with pagination)
- *   - GET    /api/v1/books/search       Search books
- *   - GET    /api/v1/books/:id          Get book by ID
- *   - PUT    /api/v1/books/:id          Update book
- *   - DELETE /api/v1/books/:id          Delete book
+ * Main API Routes
+ * Books, Borrowers, and Borrowing processes are nested under /api/v1
  */
-app.use('/api/v1/books', bookRoutes);
+app.use('/api/v1', v1Routes);
 
 // ============================================
-// 404 CATCH-ALL ROUTE
+// ERROR HANDLING
 // ============================================
 
-/**
- * Catch-all route for undefined URLs
- * Must be placed before error handler
- */
-app.use((req, res, next) => {
-  next(new AppError(`Route ${req.originalUrl} not found`, 404));
+// Catch-all for undefined routes
+app.all('*', (req, res, next) => {
+  next(new AppError(`Route ${req.originalUrl} not found on this server`, 404));
 });
 
-// ============================================
-// GLOBAL ERROR HANDLER MIDDLEWARE
-// ============================================
-
-/**
- * Global Error Handler
- * This middleware catches all errors thrown in route handlers
- * Must be defined AFTER all other middleware and routes
- */
+// Global Error Handler (must be last middleware)
 app.use(globalErrorHandler);
 
 // ============================================
-// GRACEFUL SHUTDOWN
+// PROCESS MANAGEMENT
 // ============================================
 
 /**
- * Handle process termination signals
+ * Ensure Prisma disconnects gracefully on process termination
  */
 async function gracefulShutdown(signal) {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
-  
+  console.log(`\n${signal} received. Closing database connection...`);
   try {
-    // Disconnect Prisma
     await prisma.$disconnect();
-    console.log('Database connection closed');
+    process.exit(0);
   } catch (error) {
     console.error('Error during shutdown:', error);
     process.exit(1);
   }
-
-  process.exit(0);
 }
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
