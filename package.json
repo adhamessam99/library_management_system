@@ -20,9 +20,11 @@
     "@prisma/client": "^6.1.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.0",
+    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "express-rate-limit": "^7.5.1",
     "helmet": "^8.1.0",
+    "json2csv": "^6.0.0-alpha.2",
     "pg": "^8.11.3",
     "zod": "^3.22.4"
   },

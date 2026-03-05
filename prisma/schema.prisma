@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+    url      = env("DATABASE_URL")
 }
 
 model Book {
@@ -57,7 +57,8 @@ model BorrowingRecord {
 
   @@index([borrowerId])
   @@index([bookId])
-  // Compound index for active borrowings by due date
+  @@index([borrowerId, status])
+  // Compound index for active borrowings by due date to optimize queries for overdue books
   @@index([status, dueDate])
   @@map("borrowing_records")
 }
